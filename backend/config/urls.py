@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
-from accounts.views import LoginView, LogoutView, MeView, RegisterView
+from accounts.views import CsrfView, LoginView, LogoutView, MeView, RegisterView
 from analytics.views import (
     AnalyticsPeakHoursView,
     AnalyticsSummaryView,
@@ -46,6 +46,7 @@ auth_patterns = [
     path("login/", LoginView.as_view()),
     path("logout/", LogoutView.as_view()),
     path("me/", MeView.as_view()),
+    path("csrf/", CsrfView.as_view()),
 ]
 
 public_patterns = [

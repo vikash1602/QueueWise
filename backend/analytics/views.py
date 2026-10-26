@@ -65,12 +65,14 @@ class AnalyticsSummaryView(APIView):
         cancelled_queue = queue_qs.filter(status=QueueEntry.Status.CANCELLED).count()
 
         # Waiting time: joined_at -> called_at. Service duration: started -> completed.
-        wait_avg = completed.filter(called_at__isnull=False).aggregate(
-            v=Avg(F("called_at") - F("joined_at"))
-        )["v"]
-        service_avg = completed.filter(completed_at__isnull=False).aggregate(
-            v=Avg(F("completed_at") - F("started_at"))
-        )["v"]
+        # Inverted intervals (backdated records, clock drift) are excluded so
+        # averages stay meaningful.
+        wait_avg = completed.filter(
+            called_at__isnull=False, called_at__gte=F("joined_at")
+        ).aggregate(v=Avg(F("called_at") - F("joined_at")))["v"]
+        service_avg = completed.filter(
+            completed_at__isnull=False, completed_at__gte=F("started_at")
+        ).aggregate(v=Avg(F("completed_at") - F("started_at")))["v"]
 
         business_date = local_business_date(org)
         active_size = QueueEntry.objects.filter(

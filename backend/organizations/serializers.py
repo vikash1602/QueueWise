@@ -32,7 +32,7 @@ class OrganizationSerializer(serializers.ModelSerializer):
 
 
 class PublicOrganizationSerializer(serializers.ModelSerializer):
-    services_count = serializers.IntegerField(read_only=True)
+    services_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Organization
@@ -40,6 +40,9 @@ class PublicOrganizationSerializer(serializers.ModelSerializer):
             "id", "name", "slug", "description", "address", "contact_phone",
             "services_count",
         ]
+
+    def get_services_count(self, obj):
+        return obj.services.filter(is_active=True).count()
 
 
 class BusinessHoursSerializer(serializers.ModelSerializer):
