@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { Link, useLocation } from 'react-router-dom'
 import { useLogin } from '../api/hooks'
 import { Button, ErrorState, Field, Input } from '../components/ui'
 
@@ -8,18 +7,16 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const login = useLogin()
-  const navigate = useNavigate()
   const location = useLocation()
-  const qc = useQueryClient()
   const from = (location.state as { from?: string } | null)?.from ?? '/dashboard'
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     try {
       await login.mutateAsync({ email, password })
-      // The /me query may hold a cached 403 from before the session existed.
-      await qc.invalidateQueries({ queryKey: ['me'] })
-      navigate(from, { replace: true })
+      // Full page load: guarantees no cached data from the previous session
+      // survives the identity switch.
+      window.location.assign(from)
     } catch {
       /* error surfaced below */
     }

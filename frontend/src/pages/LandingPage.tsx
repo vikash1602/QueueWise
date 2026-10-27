@@ -4,7 +4,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-brand-50 via-white to-white">
       <header className="mx-auto flex h-16 max-w-6xl items-center px-4">
-        <span className="text-xl font-bold text-brand-700">
+        <span className="text-xl font-bold text-brand-800">
           Queue<span className="text-slate-900">Wise</span>
         </span>
         <nav className="ml-auto flex gap-2">
@@ -26,7 +26,7 @@ export default function LandingPage() {
             <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
               Stop guessing the wait.
               <br />
-              <span className="text-brand-600">See your place in line.</span>
+              <span className="text-accent-600">See your place in line.</span>
             </h1>
             <p className="mt-5 max-w-lg text-lg text-slate-600">
               QueueWise gives clinics, salons, offices and service centers real-time
@@ -36,7 +36,7 @@ export default function LandingPage() {
             <div className="mt-8 flex gap-3">
               <Link
                 to="/register"
-                className="rounded-lg bg-brand-600 px-6 py-3 text-sm font-semibold text-white shadow hover:bg-brand-700"
+                className="rounded-lg bg-accent-600 px-6 py-3 text-sm font-semibold text-white shadow hover:bg-accent-700"
               >
                 Book your first visit
               </Link>

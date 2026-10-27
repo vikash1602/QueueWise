@@ -174,6 +174,66 @@ export function useAnalyticsSummary(params: string) {
   })
 }
 
+export interface AdminOverview {
+  total_customers: number
+  total_staff: number
+  total_appointments: number
+  queue_volume_total: number
+  appointments_last_7_days: number
+  queue_joins_last_7_days: number
+  today: {
+    business_date: string
+    waiting: number
+    called: number
+    in_progress: number
+    completed: number
+    no_show: number
+  }
+  service_stats: {
+    service_id: number
+    service_name: string
+    completed_total: number
+    avg_service_minutes: number | null
+    waiting_now: number
+  }[]
+  recent_activity: {
+    id: number
+    action: string
+    object_type: string
+    object_id: string
+    actor: string
+    created_at: string
+  }[]
+}
+
+export function useAdminOverview() {
+  return useQuery({
+    queryKey: ['adminOverview'],
+    queryFn: () => api.get<AdminOverview>('/api/my/analytics/overview/'),
+    refetchInterval: 30000,
+  })
+}
+
+export interface CustomerRow {
+  id: number
+  name: string
+  email: string
+  phone: string
+  appointment_count: number
+  queue_count: number
+  last_visit: string | null
+}
+
+export function useAdminCustomers(search: string, page: number) {
+  return useQuery({
+    queryKey: ['adminCustomers', search, page],
+    queryFn: () =>
+      api.get<{ count: number; page: number; page_size: number; results: CustomerRow[] }>(
+        `/api/my/customers/?search=${encodeURIComponent(search)}&page=${page}`,
+      ),
+  })
+}
+
 export function useTrends(params: string) {
   return useQuery({
     queryKey: keys.trends(params),

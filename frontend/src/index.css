@@ -1,18 +1,40 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-50: #eef4ff;
-  --color-brand-100: #dce7fd;
-  --color-brand-200: #c0d3fc;
-  --color-brand-300: #94b5fa;
-  --color-brand-400: #618df6;
-  --color-brand-500: #3d67f0;
-  --color-brand-600: #2748e4;
-  --color-brand-700: #1f38d2;
-  --color-brand-800: #2030aa;
-  --color-brand-900: #1f2f86;
+  /* Primary: navy — used via existing brand-* utilities. */
+  --color-brand-50: #f0f5fa;
+  --color-brand-100: #dce8f3;
+  --color-brand-200: #b9d0e6;
+  --color-brand-300: #8bb0d4;
+  --color-brand-400: #5489bb;
+  --color-brand-500: #2f679f;
+  --color-brand-600: #1e5186;
+  --color-brand-700: #19426d;
+  --color-brand-800: #163757;
+  --color-brand-900: #12273e;
+  --color-brand-950: #0c1a2b;
+
+  /* Accent: teal — highlights, active states, success-adjacent accents. */
+  --color-accent-50: #effaf8;
+  --color-accent-100: #d7f2ee;
+  --color-accent-200: #b0e5de;
+  --color-accent-300: #7ed1c8;
+  --color-accent-400: #4ab6ad;
+  --color-accent-500: #2b9a93;
+  --color-accent-600: #1f7c78;
+  --color-accent-700: #1c6361;
+  --color-accent-800: #1a4f4e;
+  --color-accent-900: #174241;
+
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
 html { @apply antialiased; }
-body { @apply bg-slate-50 text-slate-900; }
+body { @apply bg-slate-100 text-slate-900; }
+
+/* Consistent, visible keyboard focus across the app. */
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}

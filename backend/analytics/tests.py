@@ -129,3 +129,72 @@ class AuditLogTests(AnalyticsBase):
         client.force_authenticate(user=other_admin)
         response = client.get("/api/my/audit-logs/", {"org": self.org.id})
         self.assertEqual(response.status_code, 403)
+
+
+class AdminOverviewTests(AnalyticsBase):
+    def test_overview_admin_sees_real_totals(self):
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+        self.add_completed(1, wait_minutes=10, service_minutes=15)
+        response = client.get("/api/my/analytics/overview/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["total_staff"], 2)
+        self.assertEqual(response.data["today"]["completed"], 1)
+        self.assertIn("service_stats", response.data)
+        self.assertIn("recent_activity", response.data)
+
+    def test_overview_staff_forbidden(self):
+        client = APIClient()
+        client.force_authenticate(user=self.staff)
+        response = client.get("/api/my/analytics/overview/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_overview_counts_customers_not_staff(self):
+        # The customer has a completed record; admin/staff have none, so
+        # total_customers counts only the customer.
+        self.add_completed(1, wait_minutes=10, service_minutes=15)
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+        response = client.get("/api/my/analytics/overview/")
+        self.assertEqual(response.data["total_customers"], 1)
+
+
+class AdminCustomersTests(AnalyticsBase):
+    def test_customer_directory_lists_record_owners(self):
+        self.add_completed(1, wait_minutes=10, service_minutes=15)
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+        response = client.get("/api/my/customers/")
+        self.assertEqual(response.status_code, 200)
+        emails = [row["email"] for row in response.data["results"]]
+        self.assertIn("an@cust.io", emails)
+        # No sensitive fields leak.
+        row = response.data["results"][0]
+        for forbidden in ("password", "is_superuser", "last_login"):
+            self.assertNotIn(forbidden, row)
+
+    def test_customer_directory_search(self):
+        self.add_completed(1, wait_minutes=10, service_minutes=15)
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+        response = client.get("/api/my/customers/", {"search": "an@cust"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([r["email"] for r in response.data["results"]], ["an@cust.io"])
+
+    def test_customer_directory_staff_forbidden(self):
+        client = APIClient()
+        client.force_authenticate(user=self.staff)
+        response = client.get("/api/my/customers/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_customer_directory_isolated_per_org(self):
+        other = Organization.objects.create(name="OtherOrg2", slug="otherorg2")
+        other_admin = User.objects.create_user(email="other2@admin.io", password="Str0ngPass!x")
+        OrganizationMembership.objects.create(
+            organization=other, user=other_admin, role=OrganizationMembership.Roles.ADMIN
+        )
+        client = APIClient()
+        client.force_authenticate(user=other_admin)
+        response = client.get("/api/my/customers/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["results"], [])

@@ -1,14 +1,11 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { useRegister } from '../api/hooks'
 import { Button, ErrorState, Field, Input } from '../components/ui'
 
 export default function RegisterPage() {
   const [form, setForm] = useState({ email: '', name: '', password: '', password2: '' })
   const register = useRegister()
-  const navigate = useNavigate()
-  const qc = useQueryClient()
 
   function set(key: keyof typeof form) {
     return (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [key]: e.target.value })
@@ -18,8 +15,9 @@ export default function RegisterPage() {
     e.preventDefault()
     try {
       await register.mutateAsync(form)
-      await qc.invalidateQueries({ queryKey: ['me'] })
-      navigate('/dashboard', { replace: true })
+      // Full page load: guarantees no cached data from a previous session
+      // survives the identity switch.
+      window.location.assign('/dashboard')
     } catch {
       /* error surfaced below */
     }

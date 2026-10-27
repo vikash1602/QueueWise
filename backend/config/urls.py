@@ -4,6 +4,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from accounts.views import CsrfView, LoginView, LogoutView, MeView, RegisterView
 from analytics.views import (
+    AdminOverviewView,
     AnalyticsPeakHoursView,
     AnalyticsSummaryView,
     AnalyticsTrendsView,
@@ -21,6 +22,7 @@ from notifications.views import (
 )
 from organizations.views import (
     MyBusinessHoursView,
+    MyCustomersView,
     MyOrganizationView,
     MyServicesViewSet,
     MyStaffView,
@@ -80,8 +82,10 @@ staff_patterns = [
     path("my/services/<int:service_id>/", MyServicesViewSet.as_view()),
     path("my/business-hours/", MyBusinessHoursView.as_view()),
     path("my/staff/", MyStaffView.as_view()),
+    path("my/customers/", MyCustomersView.as_view()),
     path("my/staff/<int:member_id>/", MyStaffView.as_view()),
     path("my/analytics/summary/", AnalyticsSummaryView.as_view()),
+    path("my/analytics/overview/", AdminOverviewView.as_view()),
     path("my/analytics/trends/", AnalyticsTrendsView.as_view()),
     path("my/analytics/peak-hours/", AnalyticsPeakHoursView.as_view()),
     path("my/audit-logs/", AuditLogListView.as_view()),

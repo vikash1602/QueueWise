@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useState, type ReactNode } from
 
 /* Buttons ------------------------------------------------------------ */
 
-type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost'
+type ButtonVariant = 'primary' | 'accent' | 'secondary' | 'danger' | 'ghost'
 
 export function Button({
   variant = 'primary',
@@ -13,6 +13,7 @@ export function Button({
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant; loading?: boolean }) {
   const styles: Record<ButtonVariant, string> = {
     primary: 'bg-brand-600 text-white hover:bg-brand-700 focus-visible:outline-brand-600',
+    accent: 'bg-accent-600 text-white hover:bg-accent-700 focus-visible:outline-accent-600',
     secondary: 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50',
     danger: 'bg-red-600 text-white hover:bg-red-700',
     ghost: 'text-slate-600 hover:bg-slate-100',
@@ -126,6 +127,35 @@ export function LoadingState({ label = 'Loading…' }: { label?: string }) {
     <div className="flex items-center justify-center gap-3 py-16 text-slate-500">
       <Spinner /> <span className="text-sm">{label}</span>
     </div>
+  )
+}
+
+export function Skeleton({ className = 'h-4 w-full' }: { className?: string }) {
+  return <div className={`animate-pulse rounded bg-slate-200 ${className}`} aria-hidden="true" />
+}
+
+export function StatCard({
+  label,
+  value,
+  hint,
+  tone = 'default',
+}: {
+  label: string
+  value: string | number | null | undefined
+  hint?: string
+  tone?: 'default' | 'accent' | 'warning'
+}) {
+  const tones = {
+    default: 'text-brand-800',
+    accent: 'text-accent-700',
+    warning: 'text-amber-700',
+  }
+  return (
+    <Card className="p-4">
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
+      <p className={`mt-1 text-2xl font-semibold tabular-nums ${tones[tone]}`}>{value ?? '—'}</p>
+      {hint && <p className="mt-0.5 text-xs text-slate-400">{hint}</p>}
+    </Card>
   )
 }
 

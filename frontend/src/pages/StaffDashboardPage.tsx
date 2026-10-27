@@ -7,7 +7,7 @@ import { QUEUE_STATUS_LABELS } from '../api/types'
 import AppShell from '../components/AppShell'
 import {
   Button, Card, EmptyState, ErrorState, Field, Input, LoadingState, Modal, PageHeader,
-  Select, StatusBadge, Table, useToast,
+  Select, StatCard, StatusBadge, Table, useToast,
 } from '../components/ui'
 
 export default function StaffDashboardPage() {
@@ -139,6 +139,15 @@ export default function StaffDashboardPage() {
           ))}
         </div>
       </div>
+
+      {view === 'today' && rows.length > 0 && (
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard label="Waiting" value={rows.filter((r) => r.status === 'WAITING').length} tone="warning" />
+          <StatCard label="Called" value={rows.filter((r) => r.status === 'CALLED').length} />
+          <StatCard label="In progress" value={rows.filter((r) => r.status === 'IN_PROGRESS').length} tone="accent" />
+          <StatCard label="Completed today" value={rows.filter((r) => r.status === 'COMPLETED').length} />
+        </div>
+      )}
 
       {checkinable.length > 0 && view === 'today' && (
         <Card className="mb-4 p-4">

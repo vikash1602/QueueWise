@@ -280,3 +280,74 @@ class MyStaffView(MyOrgMixin, APIView):
             target.is_active = bool(is_active)
         target.save()
         return Response(MembershipSerializer(target).data)
+
+
+class MyCustomersView(MyOrgMixin, APIView):
+    """Admin-only, read-only customer directory: platform users who have
+    appointments or queue entries at this organization. Passwords and other
+    sensitive fields are never exposed."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        membership = self.resolve_membership(request)
+        if membership is None:
+            return Response({"detail": "No organization membership."}, status=403)
+        if membership.role != OrganizationMembership.Roles.ADMIN:
+            return Response({"detail": "Administrator role required."}, status=403)
+        org = membership.organization
+
+        from accounts.models import User
+        from appointments.models import Appointment
+        from django.db.models import Count, Max, Q
+        from queues.models import QueueEntry
+
+        appt = Appointment.objects.filter(organization=org)
+        queue = QueueEntry.objects.filter(organization=org)
+        users = (
+            User.objects.filter(
+                Q(id__in=appt.values("customer")) | Q(id__in=queue.values("customer")),
+                is_active=True,
+            )
+            .annotate(
+                appointment_count=Count("appointments", filter=Q(appointments__organization=org), distinct=True),
+                queue_count=Count("queue_entries", filter=Q(queue_entries__organization=org), distinct=True),
+                last_visit=Max("queue_entries__joined_at", filter=Q(queue_entries__organization=org)),
+            )
+            .order_by("name", "email")
+        )
+
+        search = request.query_params.get("search")
+        if search:
+            users = users.filter(
+                Q(name__icontains=search)
+                | Q(email__icontains=search)
+                | Q(phone__icontains=search)
+            )
+
+        try:
+            page = max(1, int(request.query_params.get("page", "1")))
+        except ValueError:
+            page = 1
+        page_size = 20
+        total = users.count()
+        rows = users[(page - 1) * page_size : page * page_size]
+        return Response(
+            {
+                "count": total,
+                "page": page,
+                "page_size": page_size,
+                "results": [
+                    {
+                        "id": u.id,
+                        "name": u.name,
+                        "email": u.email,
+                        "phone": u.phone,
+                        "appointment_count": u.appointment_count,
+                        "queue_count": u.queue_count,
+                        "last_visit": u.last_visit,
+                    }
+                    for u in rows
+                ],
+            }
+        )

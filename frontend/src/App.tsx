@@ -14,6 +14,8 @@ import CustomerDashboardPage from './pages/CustomerDashboardPage'
 import AppointmentDetailPage from './pages/AppointmentDetailPage'
 import QueueTrackingPage from './pages/QueueTrackingPage'
 import StaffDashboardPage from './pages/StaffDashboardPage'
+import AdminDashboardPage from './pages/AdminDashboardPage'
+import AdminCustomersPage from './pages/AdminCustomersPage'
 import AdminSettingsPage from './pages/AdminSettingsPage'
 import StaffManagementPage from './pages/StaffManagementPage'
 import AnalyticsPage from './pages/AnalyticsPage'
@@ -40,7 +42,7 @@ export default function App() {
     },
     async logout() {
       await api.post('/api/auth/logout/')
-      await queryClient.invalidateQueries()
+      queryClient.clear()
     },
   }
 
@@ -74,6 +76,14 @@ export default function App() {
         <Route
           path="/staff"
           element={<RequireAuth me={me} allow={isStaff}><StaffDashboardPage /></RequireAuth>}
+        />
+        <Route
+          path="/admin"
+          element={<RequireAuth me={me} allow={isAdmin}><AdminDashboardPage /></RequireAuth>}
+        />
+        <Route
+          path="/admin/customers"
+          element={<RequireAuth me={me} allow={isAdmin}><AdminCustomersPage /></RequireAuth>}
         />
         <Route
           path="/admin/settings"

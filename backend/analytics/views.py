@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+from django.db import models
 from django.db.models import Avg, Count, F
 from django.db.models.functions import TruncHour
 from django.utils import timezone as dj_timezone
@@ -166,5 +167,96 @@ class AnalyticsPeakHoursView(APIView):
                 "peak_hours": [
                     {"hour": row["hour"], "joins": row["joins"]} for row in hours
                 ]
+            }
+        )
+
+
+class AdminOverviewView(APIView):
+    """Organization-wide totals for the admin dashboard. Every number is
+    computed from persisted records; each metric states its period."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from audit.models import AuditLog
+
+        membership = _membership_or_none(request)
+        if membership is None:
+            return Response({"detail": "No organization membership."}, status=403)
+        if membership.role != OrganizationMembership.Roles.ADMIN:
+            return Response({"detail": "Administrator role required."}, status=403)
+        org = membership.organization
+
+        from accounts.models import User
+
+        appointment_customers = Appointment.objects.filter(organization=org).values("customer")
+        queue_customers = QueueEntry.objects.filter(organization=org).values("customer")
+        total_customers = (
+            User.objects.filter(
+                models.Q(id__in=appointment_customers) | models.Q(id__in=queue_customers)
+            )
+            .filter(is_active=True)
+            .count()
+        )
+
+        now = dj_timezone.now()
+        business_date = local_business_date(org)
+        today_entries = QueueEntry.objects.filter(organization=org, business_date=business_date)
+        week_ago = now - timedelta(days=7)
+
+        service_stats = []
+        for service in org.services.filter(is_active=True):
+            completed = QueueEntry.objects.filter(
+                service=service, status=QueueEntry.Status.COMPLETED
+            )
+            avg_minutes = completed.filter(completed_at__isnull=False, completed_at__gte=F("started_at")).aggregate(
+                v=Avg(F("completed_at") - F("started_at"))
+            )["v"]
+            service_stats.append(
+                {
+                    "service_id": service.id,
+                    "service_name": service.name,
+                    "completed_total": completed.count(),
+                    "avg_service_minutes": round(avg_minutes.total_seconds() / 60, 1) if avg_minutes else None,
+                    "waiting_now": QueueEntry.objects.filter(
+                        service=service, status=QueueEntry.Status.WAITING
+                    ).count(),
+                }
+            )
+
+        recent_activity = AuditLog.objects.filter(organization=org).select_related("actor")[:8]
+
+        return Response(
+            {
+                "total_customers": total_customers,
+                "total_staff": org.memberships.filter(is_active=True).count(),
+                "total_appointments": Appointment.objects.filter(organization=org).count(),
+                "queue_volume_total": QueueEntry.objects.filter(organization=org).count(),
+                "appointments_last_7_days": Appointment.objects.filter(
+                    organization=org, created_at__gte=week_ago
+                ).count(),
+                "queue_joins_last_7_days": QueueEntry.objects.filter(
+                    organization=org, joined_at__gte=week_ago
+                ).count(),
+                "today": {
+                    "business_date": business_date.isoformat(),
+                    "waiting": today_entries.filter(status=QueueEntry.Status.WAITING).count(),
+                    "called": today_entries.filter(status=QueueEntry.Status.CALLED).count(),
+                    "in_progress": today_entries.filter(status=QueueEntry.Status.IN_PROGRESS).count(),
+                    "completed": today_entries.filter(status=QueueEntry.Status.COMPLETED).count(),
+                    "no_show": today_entries.filter(status=QueueEntry.Status.NO_SHOW).count(),
+                },
+                "service_stats": service_stats,
+                "recent_activity": [
+                    {
+                        "id": log.id,
+                        "action": log.action,
+                        "object_type": log.object_type,
+                        "object_id": log.object_id,
+                        "actor": log.actor.name or log.actor.email if log.actor else "system",
+                        "created_at": log.created_at,
+                    }
+                    for log in recent_activity
+                ],
             }
         )
