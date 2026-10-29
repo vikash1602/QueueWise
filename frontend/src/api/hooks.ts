@@ -42,6 +42,13 @@ export function useMe() {
     queryKey: keys.me,
     queryFn: () => api.get<Me>('/api/auth/me/'),
     retry: false,
+    // Re-derive identity when a background tab regains focus: another tab
+    // may have logged in / registered as a different account, which swaps
+    // this browser's shared session cookie. Without this, a stale staff or
+    // admin console keeps rendering and its API calls legitimately fail
+    // with membership errors for the now-current (membership-less) account.
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   })
 }
 
