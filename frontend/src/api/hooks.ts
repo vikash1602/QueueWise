@@ -166,6 +166,28 @@ export function useStaffQueue(params: string) {
   })
 }
 
+export interface CheckInCandidate {
+  id: number
+  customer_name: string
+  customer_email: string
+  service_id: number
+  service_name: string
+  slot_start: string
+  slot_end: string
+  status: string
+}
+
+export function useStaffCheckIns(date: string) {
+  return useQuery({
+    queryKey: ['staffCheckIns', date],
+    queryFn: () =>
+      api.get<{ business_date: string; results: CheckInCandidate[] }>(
+        `/api/staff/queue/check-ins/${date ? `?date=${date}` : ''}`,
+      ),
+    refetchInterval: 15000,
+  })
+}
+
 export function useStaffHistory(date: string) {
   return useQuery({
     queryKey: keys.staffHistory(date),

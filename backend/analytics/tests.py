@@ -20,7 +20,7 @@ class AnalyticsBase(TestCase):
                 opens_at=datetime.strptime("09:00", "%H:%M").time(),
                 closes_at=datetime.strptime("17:00", "%H:%M").time(),
             )
-            for d in range(5)
+            for d in range(7)
         )
         self.service = Service.objects.create(
             organization=self.org, name="Consult", duration_minutes=15

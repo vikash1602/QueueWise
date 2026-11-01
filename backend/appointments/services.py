@@ -13,22 +13,24 @@ from .models import Appointment
 
 
 def availability(organization, service, day):
-    """Return bookable slots with their taken status for a date."""
+    """Return bookable slots with their taken status for a date.
+
+    A slot is taken when any live appointment overlaps it (not merely one
+    with an identical start), so off-grid bookings still block the grid."""
     slots = slots_for_service(organization, service, day)
-    taken = set(
-        Appointment.objects.filter(
-            service=service,
-            slot_start__in=[s[0] for s in slots],
-        )
-        .exclude(status__in=[Appointment.Status.CANCELLED, Appointment.Status.NO_SHOW])
-        .values_list("slot_start", flat=True)
-    )
     now = dj_timezone.now()
+    live = Appointment.objects.filter(
+        service=service,
+        slot_start__lt=max((end for _, end in slots), default=now),
+        slot_end__gt=min((start for start, _ in slots), default=now),
+    ).exclude(status__in=[Appointment.Status.CANCELLED, Appointment.Status.NO_SHOW])
+    booked_ranges = [(a.slot_start, a.slot_end) for a in live]
     return [
         {
             "slot_start": start,
             "slot_end": end,
-            "is_available": start not in taken and start > now,
+            "is_available": start > now
+            and not any(b_start < end and b_end > start for b_start, b_end in booked_ranges),
         }
         for start, end in slots
     ]
@@ -61,7 +63,10 @@ def book(*, customer, service, slot_start, organization=None):
     if hours is None or hours.is_closed:
         raise OutsideBusinessHours("The organization is closed on that day.")
     slot_end = slot_start + timedelta(minutes=service.duration_minutes)
-    local_end_t = slot_end.astimezone(tz).time()
+    # The service plus its cleanup buffer must both fit inside operating
+    # hours — backend-enforced so the frontend can never book past closing.
+    buffer_end = slot_end + timedelta(minutes=service.buffer_minutes)
+    local_end_t = buffer_end.astimezone(tz).time()
     if not (hours.opens_at <= local_start.time() and local_end_t <= hours.closes_at):
         raise OutsideBusinessHours(
             "The selected time is outside the organization's operating hours."

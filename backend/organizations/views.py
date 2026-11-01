@@ -39,9 +39,15 @@ class PublicOrganizationDetailView(APIView):
     def get(self, request, org_id):
         org = get_object_or_404(Organization, pk=org_id, is_active=True)
         hours = BusinessHoursSerializer(org.business_hours.all(), many=True).data
+        profile_incomplete = (
+            org.name == "My Organization"
+            or not org.address.strip()
+            or not org.contact_phone.strip()
+        )
         return Response(
             {
                 **PublicOrganizationSerializer(org).data,
+                "profile_incomplete": profile_incomplete,
                 "business_hours": hours,
                 "services": ServiceSerializer(
                     org.services.filter(is_active=True), many=True

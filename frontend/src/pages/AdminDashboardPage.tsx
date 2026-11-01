@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { useAdminOverview } from '../api/hooks'
+import { useAdminOverview, useMyOrganization } from '../api/hooks'
 import AppShell from '../components/AppShell'
 import { Card, ErrorState, PageHeader, Skeleton, StatCard, Table } from '../components/ui'
 
@@ -18,6 +18,9 @@ const ACTION_LABELS: Record<string, string> = {
 
 export default function AdminDashboardPage() {
   const { data, isLoading, isError, error, refetch } = useAdminOverview()
+  const { data: org } = useMyOrganization()
+  const profileIncomplete =
+    org != null && (!org.address?.trim() || !org.contact_phone?.trim() || org.name === 'My Organization')
 
   if (isLoading) {
     return (
@@ -39,6 +42,16 @@ export default function AdminDashboardPage() {
   const d = data!
   return (
     <AppShell>
+      {profileIncomplete && (
+        <Card className="mb-6 border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-medium text-amber-800">Organization setup incomplete</p>
+          <p className="mt-1 text-sm text-amber-700">
+            Add your organization's real name, address and contact details under{" "}
+            <Link to="/admin/settings" className="font-semibold underline">Services &amp; hours</Link>{" "}
+            so customers see genuine information.
+          </p>
+        </Card>
+      )}
       <PageHeader
         title="Dashboard"
         subtitle={`Operating day ${d.today.business_date} · all metrics computed from stored records`}

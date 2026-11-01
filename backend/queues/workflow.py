@@ -24,7 +24,8 @@ def _entry_display_name(entry):
 @transaction.atomic
 def join_queue(*, organization, service, customer=None, guest_name="", source=None):
     """Add a customer (or guest walk-in registered by staff) to today's queue."""
-    if not service.is_walkin_enabled:
+    is_appointment_checkin = source == QueueEntry.Source.APPOINTMENT
+    if not service.is_walkin_enabled and not is_appointment_checkin:
         raise QueueWiseError("Walk-in queue is not enabled for this service.")
     business_date = local_business_date(organization)
     hours = BusinessHours.objects.filter(
@@ -67,12 +68,22 @@ def check_in_appointment(appointment, *, actor):
     """Convert a confirmed appointment into a queue entry (customer arrives)."""
     from appointments.models import Appointment
 
-    if appointment.status != Appointment.Status.CONFIRMED:
+    # Lock the appointment row: concurrent check-ins serialize here, so the
+    # OneToOne appointment-to-entry link can never be violated and repeated
+    # requests are rejected cleanly instead of raising an IntegrityError.
+    locked = Appointment.objects.select_for_update().get(pk=appointment.pk)
+    if locked.status == Appointment.Status.CHECKED_IN:
+        existing = QueueEntry.objects.filter(appointment_id=locked.pk).first()
+        if existing:
+            return existing  # idempotent re-check-in returns the same entry
+        raise QueueWiseError("This appointment is already checked in.")
+    if locked.status != Appointment.Status.CONFIRMED:
         raise QueueWiseError(
-            f"Only confirmed appointments can be checked in (status: {appointment.status})."
+            f"Only confirmed appointments can be checked in (status: {locked.status})."
         )
-    appointment.status = Appointment.Status.CHECKED_IN
-    appointment.save(update_fields=["status", "updated_at"])
+    locked.status = Appointment.Status.CHECKED_IN
+    locked.save(update_fields=["status", "updated_at"])
+    appointment.status = locked.status
     entry = join_queue(
         organization=appointment.organization,
         service=appointment.service,

@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
-import { useMyServices, useStaffQueue, useStaffHistory, useAppointments } from '../api/hooks'
-import type { Appointment, QueueEntry } from '../api/types'
+import { useMyServices, useStaffQueue, useStaffHistory, useStaffCheckIns } from '../api/hooks'
+import type { QueueEntry } from '../api/types'
 import { QUEUE_STATUS_LABELS } from '../api/types'
 import AppShell from '../components/AppShell'
 import {
@@ -25,12 +25,12 @@ export default function StaffDashboardPage() {
   if (search) params.set('search', search)
   const today = useStaffQueue(params.toString() ? `?${params}` : '')
   const history = useStaffHistory('')
-  const { data: appointments } = useAppointments() as { data?: Appointment[] }
-  const checkinable = (appointments ?? []).filter(
-    (a) => a.status === 'CONFIRMED' && a.organization === services?.[0]?.id,
-  )
+  // Org-scoped list of today's confirmed appointments awaiting check-in.
+  const checkIns = useStaffCheckIns('')
+  const checkinable = checkIns.data?.results ?? []
 
   function refresh() {
+    qc.invalidateQueries({ queryKey: ['staffCheckIns'] })
     qc.invalidateQueries({ queryKey: ['staffQueue'] })
     qc.invalidateQueries({ queryKey: ['myQueue'] })
     qc.invalidateQueries({ queryKey: ['staffHistory'] })
@@ -153,9 +153,9 @@ export default function StaffDashboardPage() {
         <Card className="mb-4 p-4">
           <p className="mb-2 text-sm font-medium text-slate-700">Arrived with an appointment? Check them in:</p>
           <div className="flex flex-wrap gap-2">
-            {checkinable.slice(0, 5).map((appt) => (
+            {checkinable.slice(0, 6).map((appt) => (
               <Button key={appt.id} variant="secondary" onClick={() => checkIn.mutate(appt.id)}>
-                Check in {appt.customer_email} · {new Date(appt.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                Check in {appt.customer_name} · {appt.service_name} · {new Date(appt.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </Button>
             ))}
           </div>
@@ -181,8 +181,13 @@ export default function StaffDashboardPage() {
               <td className="px-4 py-3">
                 <StatusBadge status={entry.status} label={QUEUE_STATUS_LABELS[entry.status]} />
               </td>
-              <td className="px-4 py-3">
-                {entry.status === 'WAITING' ? `≈ ${entry.estimated_wait_minutes} min` : '—'}
+              <td className="px-4 py-3 whitespace-nowrap text-slate-500">
+                {new Date(entry.joined_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </td>
+              <td className="px-4 py-3 tabular-nums">
+                {['WAITING', 'CALLED'].includes(entry.status)
+                  ? `${Math.max(0, Math.round((Date.now() - +new Date(entry.joined_at)) / 60000))} min`
+                  : '—'}
               </td>
               <td className="px-4 py-3">
                 {view === 'today' ? (

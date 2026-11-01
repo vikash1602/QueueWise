@@ -17,6 +17,12 @@ export default function OrganizationPage() {
   return (
     <AppShell>
       <PageHeader title={org!.name} subtitle={org!.description || undefined} />
+      {org!.profile_incomplete && (
+        <Card className="mb-6 border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+          This organization is completing its profile. Booking is fully functional —
+          the business details shown here will be filled in by the organization.
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">

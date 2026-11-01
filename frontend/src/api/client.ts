@@ -47,9 +47,47 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   })
 
   if (response.status === 204) return undefined as T
+  const contentType = response.headers.get('Content-Type') ?? ''
   const text = await response.text()
-  const data = text ? JSON.parse(text) : {}
-  if (!response.ok) throw new ApiError(response.status, data)
+
+  let data: unknown
+  if (text === '') {
+    data = {}
+  } else if (contentType.includes('application/json')) {
+    try {
+      data = JSON.parse(text)
+    } catch {
+      // Malformed JSON from the server: surface the body, not a parse error.
+      data = { detail: text.slice(0, 200) }
+    }
+  } else {
+    // Non-JSON error body (e.g. a server or proxy failure page). Keep the
+    // server's own first line — e.g. "OperationalError at /api/..." — so the
+    // original failure stays visible instead of becoming a parse error.
+    const firstLine = text.split('\n', 1)[0].trim().slice(0, 200)
+    data = {
+      detail: firstLine
+        ? `${firstLine} (server error — the service may be temporarily unavailable)`
+        : `Unexpected ${response.status} response from the server`,
+    }
+  }
+
+  if (!response.ok) {
+    // A 401 on an app page means the session is gone (expired, or signed
+    // out in another tab/browser). Send the user to login with a clean
+    // cache instead of letting them act on a dead session. Login/register
+    // failures are excluded — they show their own error message.
+    if (
+      response.status === 401 &&
+      !path.startsWith('/api/auth/') &&
+      typeof window !== 'undefined' &&
+      !['/login', '/register', '/'].includes(window.location.pathname)
+    ) {
+      import('../queryClient').then(({ queryClient }) => queryClient.clear())
+      window.location.assign('/login')
+    }
+    throw new ApiError(response.status, data)
+  }
   return data as T
 }
 

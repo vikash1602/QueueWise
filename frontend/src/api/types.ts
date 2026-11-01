@@ -26,6 +26,7 @@ export interface Organization {
   description: string
   address: string
   contact_phone: string
+  profile_incomplete?: boolean
   services_count?: number
   business_hours?: BusinessHours[]
   services?: Service[]

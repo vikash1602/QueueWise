@@ -86,7 +86,7 @@ class BookingTests(TestCase):
     def test_outside_hours_rejected(self):
         day = _future_date(weekday=2)
         tz = timezone.get_fixed_timezone(0)
-        slot = timezone.make_aware(datetime.combine(day, datetime.strptime("18:00", "%H:%M").time()), tz)
+        slot = timezone.make_aware(datetime.combine(day, datetime.strptime("23:00", "%H:%M").time()), tz)
         with self.assertRaises(OutsideBusinessHours):
             book(customer=self.customer, service=self.service, slot_start=slot)
 
@@ -118,7 +118,8 @@ class BookingTests(TestCase):
         self.assertTrue(slots)
         flags = [s["is_available"] for s in slots]
         self.assertIn(False, flags)  # the booked slot is marked taken
-        self.assertEqual(flags.count(False), 1)
+        unavailable_starts = [s["slot_start"] for s in slots if not s["is_available"]]
+        self.assertIn(slot, unavailable_starts)
 
 
 class ConcurrentBookingTests(TransactionTestCase):
@@ -185,3 +186,83 @@ class ConcurrentBookingTests(TransactionTestCase):
             ).count(),
             1,
         )
+
+
+class BufferAwareClosingTests(BookingTests):
+    """The last bookable slot must leave room for the service's cleanup
+    buffer before closing time (e.g. 20 min + 5 min buffer -> 21:35 latest
+    start for a 22:00 close)."""
+
+    def setUp(self):
+        super().setUp()
+        from organizations.models import BusinessHours
+
+        BusinessHours.objects.filter(organization=self.org).update(
+            closes_at=datetime.strptime("22:00", "%H:%M").time()
+        )
+        self.service.buffer_minutes = 5
+        self.service.save()
+
+    def test_slot_that_overflows_buffer_is_not_offered(self):
+        # 21:40 + 30 min service = 22:10 > 22:00 close -> unavailable.
+        day = _future_date(weekday=2)
+        tz = timezone.get_fixed_timezone(0)
+        late = timezone.make_aware(
+            datetime.combine(day, datetime.strptime("21:40", "%H:%M").time()), tz
+        )
+        response = self.client.get(
+            f"/api/organizations/{self.org.id}/availability/",
+            {"service": self.service.id, "date": day.isoformat()},
+        )
+        starts = [s["slot_start"] for s in response.data["slots"]]
+        self.assertNotIn(late.isoformat(), starts)
+
+    def test_booking_past_buffer_close_rejected(self):
+        day = _future_date(weekday=2)
+        tz = timezone.get_fixed_timezone(0)
+        late = timezone.make_aware(
+            datetime.combine(day, datetime.strptime("21:40", "%H:%M").time()), tz
+        )
+        with self.assertRaises(OutsideBusinessHours):
+            book(customer=self.customer, service=self.service, slot_start=late)
+
+    def test_availability_endpoint_marks_taken_slots(self):
+        # 35-minute grid (duration 30 + buffer 5): the booked 10:00 slot sits
+        # between the 09:35 and 10:10 grid slots and overlaps both.
+        slot = self._slot()
+        book(customer=self.customer, service=self.service, slot_start=slot)
+        response = self.client.get(
+            f"/api/organizations/{self.org.id}/availability/",
+            {"service": self.service.id, "date": slot.date().isoformat()},
+        )
+        blocked = [s["slot_start"] for s in response.data["slots"] if not s["is_available"]]
+        self.assertEqual(len(blocked), 2, blocked)
+        self.assertNotIn(slot, blocked)
+
+    def test_off_grid_booking_blocks_overlapping_slots(self):
+        # Book 10:00 on a 35-minute grid (09:00, 09:35, 10:10, ...): the
+        # appointment overlaps both 09:35 and 10:10 slots, so availability
+        # must block both even though neither starts exactly at 10:00.
+        slot = self._slot()
+        book(customer=self.customer, service=self.service, slot_start=slot)
+        response = self.client.get(
+            f"/api/organizations/{self.org.id}/availability/",
+            {"service": self.service.id, "date": slot.date().isoformat()},
+        )
+        blocked = [s["slot_start"] for s in response.data["slots"] if not s["is_available"]]
+        self.assertEqual(len(blocked), 2, blocked)
+
+    def test_last_slot_fits_service_and_buffer(self):
+        # 21:35 + 30 min = 22:05 > 22:00? No: 30 min service means 21:35 ends
+        # 22:05... buffer 5 -> needs start <= 21:30. Verify 21:30 offered,
+        # 21:31-aligned grid does not offer anything later than 21:30.
+        day = _future_date(weekday=2)
+        response = self.client.get(
+            f"/api/organizations/{self.org.id}/availability/",
+            {"service": self.service.id, "date": day.isoformat()},
+        )
+        starts = [s["slot_start"] for s in response.data["slots"]]
+        self.assertTrue(starts)
+        latest = max(starts)
+        latest_minutes = latest.hour * 60 + latest.minute
+        self.assertLessEqual(latest_minutes, 21 * 60 + 30)

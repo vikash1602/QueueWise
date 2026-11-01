@@ -1,5 +1,14 @@
+from datetime import timezone as dt_timezone
+from zoneinfo import ZoneInfo
+
 from django.shortcuts import get_object_or_404
 from django.utils import timezone as dj_timezone
+
+
+def _org_local(moment, organization):
+    """Format a timestamp in the organization's own timezone (e.g. IST)."""
+    local = moment.astimezone(ZoneInfo(organization.timezone))
+    return f"{local:%Y-%m-%d %H:%M} {local.tzname()}"
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -64,7 +73,7 @@ class AppointmentListCreateView(APIView):
             user=request.user,
             type=notification_service.Notification.Types.BOOKING_CONFIRMED,
             title="Appointment confirmed",
-            body=f"{service.name} on {appointment.slot_start:%Y-%m-%d %H:%M} (UTC).",
+            body=f"{service.name} on {_org_local(appointment.slot_start, appointment.organization)}.",
             payload={"appointment_id": appointment.id},
         )
         return Response(AppointmentSerializer(appointment).data, status=status.HTTP_201_CREATED)
@@ -113,7 +122,7 @@ class AppointmentCancelView(APIView):
             type=notification_service.Notification.Types.BOOKING_CANCELLED,
             title="Appointment cancelled",
             body=f"Your {appointment.service.name} appointment on "
-            f"{appointment.slot_start:%Y-%m-%d %H:%M} (UTC) was cancelled.",
+            f"{_org_local(appointment.slot_start, appointment.organization)} was cancelled.",
             payload={"appointment_id": appointment.id},
         )
         return Response(AppointmentSerializer(appointment).data)

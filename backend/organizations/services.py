@@ -36,7 +36,10 @@ def slots_for_service(organization, service, day):
         return []
     slots = []
     now = dj_timezone.now()
-    while start + timedelta(minutes=service.duration_minutes) <= end_of_day:
+    # A slot is offerable only if the service AND its cleanup buffer finish
+    # by closing time (e.g. 20 min + 5 min buffer: last start 21:35 for a
+    # 22:00 close).
+    while start + step <= end_of_day:
         slot_end = start + timedelta(minutes=service.duration_minutes)
         if start > now:
             slots.append((start, slot_end))

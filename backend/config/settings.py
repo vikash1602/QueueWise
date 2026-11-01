@@ -45,6 +45,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
+    "config.middleware.DatabaseErrorJsonMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -84,7 +85,11 @@ DATABASES = {
         "PASSWORD": os.environ.get("DB_PASSWORD", ""),
         "HOST": os.environ.get("DB_HOST", "127.0.0.1"),
         "PORT": os.environ.get("DB_PORT", "5433"),
-        "CONN_MAX_AGE": 60,
+        # 0 = close the DB connection at the end of every request. Persistent
+        # connections (CONN_MAX_AGE>0) are held per browser keep-alive thread,
+        # which with runserver's thread-per-connection model accumulated ~100
+        # idle connections and exhausted max_connections (see incident 31 Oct).
+        "CONN_MAX_AGE": 0,
         "OPTIONS": {"connect_timeout": 5},
     }
 }

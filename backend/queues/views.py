@@ -301,3 +301,58 @@ class PublicNowServingView(APIView):
                 }
             )
         return Response({"business_date": business_date.isoformat(), "services": result})
+
+
+class StaffCheckInListView(APIView):
+    """Staff: confirmed appointments for the operating day that are waiting
+    for check-in. Org-scoped through the caller's membership."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        membership, err = _require_membership(request)
+        if err:
+            return err
+        org = membership.organization
+        business_date = local_business_date(org)
+        day_param = request.query_params.get("date")
+        if day_param:
+            from datetime import date as date_cls
+
+            try:
+                business_date = date_cls.fromisoformat(day_param)
+            except ValueError:
+                return Response({"detail": "Invalid date; use YYYY-MM-DD."}, status=400)
+
+        # Appointments whose slot falls on this operating day in the
+        # organization's own timezone, still live, in slot order.
+        from zoneinfo import ZoneInfo
+
+        from django.db.models.functions import TruncDate
+
+        local_day = TruncDate("slot_start", tzinfo=ZoneInfo(org.timezone))
+        appointments = (
+            Appointment.objects.filter(organization=org, status=Appointment.Status.CONFIRMED)
+            .annotate(local_day=local_day)
+            .filter(local_day=business_date)
+            .select_related("service", "customer")
+            .order_by("slot_start")
+        )
+        return Response(
+            {
+                "business_date": business_date.isoformat(),
+                "results": [
+                    {
+                        "id": a.id,
+                        "customer_name": a.customer.get_full_name() or a.customer.email,
+                        "customer_email": a.customer.email,
+                        "service_id": a.service_id,
+                        "service_name": a.service.name,
+                        "slot_start": a.slot_start,
+                        "slot_end": a.slot_end,
+                        "status": a.status,
+                    }
+                    for a in appointments
+                ],
+            }
+        )

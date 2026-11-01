@@ -32,6 +32,7 @@ from organizations.views import (
 )
 from queues.views import (
     MyQueueEntriesView,
+    StaffCheckInListView,
     MyQueueEntryCancelView,
     MyQueueEntryStatusView,
     PublicNowServingView,
@@ -90,6 +91,7 @@ staff_patterns = [
     path("my/analytics/peak-hours/", AnalyticsPeakHoursView.as_view()),
     path("my/audit-logs/", AuditLogListView.as_view()),
     path("staff/queue/today/", StaffQueueTodayView.as_view()),
+    path("staff/queue/check-ins/", StaffCheckInListView.as_view()),
     path("staff/queue/walk-in/", StaffWalkInView.as_view()),
     path("staff/queue/call-next/", StaffCallNextView.as_view()),
     path("staff/queue/check-in/<int:appointment_id>/", StaffCheckInView.as_view()),
