@@ -1,6 +1,37 @@
+from django.conf import settings
 from django.contrib import admin
-from django.urls import include, path
+from django.http import FileResponse
+from django.urls import include, path, re_path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+
+
+def spa(request, *_args, **_kwargs):
+    """Serve the built React app (production single-origin deployment).
+
+    Registered last, so /api/, /admin/, /static/ and /ws/ all match their
+    real handlers first. Public files that live in the dist root (favicon)
+    are served directly; every other unknown path returns index.html so
+    client-side routing works. In development the Vite dev server plays
+    this role instead.
+    """
+    from django.http import JsonResponse
+
+    rel_path = request.path.lstrip("/")
+    candidate = settings.FRONTEND_DIST / rel_path
+    if (
+        rel_path
+        and ".." not in rel_path
+        and candidate.is_file()
+        and candidate.parent == settings.FRONTEND_DIST
+    ):
+        return FileResponse(candidate.open("rb"))
+    index = settings.FRONTEND_DIST / "index.html"
+    if not index.exists():
+        return JsonResponse(
+            {"detail": "Frontend build not found. Run: npm --prefix ../frontend run build"},
+            status=503,
+        )
+    return FileResponse(index.open("rb"), content_type="text/html")
 
 from accounts.views import CsrfView, LoginView, LogoutView, MeView, RegisterView
 from analytics.views import (
@@ -118,4 +149,10 @@ urlpatterns = [
         SpectacularSwaggerView.as_view(url_name="schema"),
         name="swagger-ui",
     ),
+]
+
+# Production catch-all: everything that is not API/admin/static/ws serves the
+# React app, enabling client-side routing (/dashboard, /queue/5, ...).
+urlpatterns += [
+    re_path(r"^(?!api/|admin/|static/|ws/).*$", spa),
 ]

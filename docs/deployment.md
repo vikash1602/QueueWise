@@ -1,6 +1,25 @@
 # Deployment Guide
 
-## Overview
+## Option 1 — Render.com (recommended, blueprint deploy)
+
+The repository includes `render.yaml`, which provisions a web service
+(Django + daphne serving both the API and the built React app) and a free
+PostgreSQL database.
+
+1. Push the repository to GitHub.
+2. In Render: **New → Blueprint**, select the repository, apply.
+3. Render builds: installs Python deps, builds the frontend with npm,
+   collects static files, and runs migrations.
+4. After the first deploy, open the service → **Environment** and set:
+   - `DJANGO_ALLOWED_HOSTS` = your-app.onrender.com
+   - `CORS_ALLOWED_ORIGINS` = https://your-app.onrender.com
+5. The service restarts automatically. Done — one URL serves everything.
+
+Free-plan notes: the web service sleeps after ~15 minutes idle (first
+request is slow) and the free database expires after 30 days. Paid plans
+remove both limits.
+
+## Overview (self-hosted alternative)
 
 - **Backend**: Django 5.2 under Daphne (ASGI, required for WebSockets), behind
   a reverse proxy (nginx/Caddy) or a platform that terminates TLS.

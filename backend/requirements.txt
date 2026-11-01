@@ -21,8 +21,8 @@ jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
 msgpack==1.2.3
 packaging==26.3
-psycopg==3.2.9
-psycopg-binary==3.2.9
+psycopg==3.3.6
+psycopg-binary==3.3.6
 pycparser==3.12
 pyOpenSSL==26.4.0
 python-dotenv==1.1.1
@@ -37,4 +37,5 @@ typing_extensions==4.16.0
 tzdata==2026.5
 ujson==6.0.0
 uritemplate==4.2.0
+whitenoise==6.9.0
 zope.interface==8.7

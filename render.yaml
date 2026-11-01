@@ -1,0 +1,42 @@
+# Render.com blueprint for QueueWise (single-origin deployment).
+# Deploy: push this repo to GitHub, then in Render choose
+# "New -> Blueprint" and select the repository.
+services:
+  - type: web
+    name: queuewise
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: |
+      pip install -r requirements.txt &&
+      npm --prefix ../frontend install &&
+      npm --prefix ../frontend run build &&
+      python manage.py collectstatic --noinput &&
+      python manage.py migrate
+    startCommand: daphne -b 0.0.0.0 -p $PORT config.asgi:application
+    healthCheckPath: /api/organizations/
+    envVars:
+      - key: DJANGO_DEBUG
+        value: "0"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: queuewise-db
+          property: connectionString
+      - key: USE_INMEMORY_CHANNEL_LAYER
+        value: "1"
+      - key: QUEUEWISE_SEND_EMAIL_NOTIFICATIONS
+        value: "0"
+      - key: DJANGO_ALLOWED_HOSTS
+        sync: false   # set to your-app.onrender.com after the first deploy
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false   # set to https://your-app.onrender.com (CSRF + CORS)
+      - key: PYTHON_VERSION
+        value: "3.13.1"
+
+databases:
+  - name: queuewise-db
+    databaseName: queuewise
+    user: queuewise
+    plan: free

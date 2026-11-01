@@ -4,6 +4,9 @@ import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Production base: the built app is served by Django under /static/
+  // (whitenoise), keeping everything on one origin.
+  base: '/static/',
   plugins: [react(), tailwindcss()],
   server: {
     port: 5173,

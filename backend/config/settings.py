@@ -47,6 +47,7 @@ MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "config.middleware.DatabaseErrorJsonMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -77,22 +78,43 @@ ASGI_APPLICATION = "config.asgi.application"
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-DATABASES = {
-    "default": {
+def _database_from_url(url):
+    """Parse a postgres:// or postgresql:// connection string into the
+    Django DATABASES format (used by managed hosts like Render)."""
+    from urllib.parse import urlsplit, unquote
+
+    parts = urlsplit(url)
+    return {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("DB_NAME", "queuewise"),
-        "USER": os.environ.get("DB_USER", "queuewise_app"),
-        "PASSWORD": os.environ.get("DB_PASSWORD", ""),
-        "HOST": os.environ.get("DB_HOST", "127.0.0.1"),
-        "PORT": os.environ.get("DB_PORT", "5433"),
-        # 0 = close the DB connection at the end of every request. Persistent
-        # connections (CONN_MAX_AGE>0) are held per browser keep-alive thread,
-        # which with runserver's thread-per-connection model accumulated ~100
-        # idle connections and exhausted max_connections (see incident 31 Oct).
+        "NAME": unquote(parts.path.lstrip("/")),
+        "USER": unquote(parts.username or ""),
+        "PASSWORD": unquote(parts.password or ""),
+        "HOST": parts.hostname or "",
+        "PORT": str(parts.port or 5432),
         "CONN_MAX_AGE": 0,
-        "OPTIONS": {"connect_timeout": 5},
+        "OPTIONS": {"connect_timeout": 5, "sslmode": "prefer"},
     }
-}
+
+
+if os.environ.get("DATABASE_URL"):
+    DATABASES = {"default": _database_from_url(os.environ["DATABASE_URL"])}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ.get("DB_NAME", "queuewise"),
+            "USER": os.environ.get("DB_USER", "queuewise_app"),
+            "PASSWORD": os.environ.get("DB_PASSWORD", ""),
+            "HOST": os.environ.get("DB_HOST", "127.0.0.1"),
+            "PORT": os.environ.get("DB_PORT", "5433"),
+            # 0 = close the DB connection at the end of every request. Persistent
+            # connections (CONN_MAX_AGE>0) are held per browser keep-alive thread,
+            # which with runserver's thread-per-connection model accumulated ~100
+            # idle connections and exhausted max_connections (see incident 31 Oct).
+            "CONN_MAX_AGE": 0,
+            "OPTIONS": {"connect_timeout": 5},
+        }
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -108,6 +130,21 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Single-origin deployment: Django also serves the built React app.
+FRONTEND_DIST = BASE_DIR.parent / "frontend" / "dist"
+STATICFILES_DIRS = [FRONTEND_DIST] if FRONTEND_DIST.exists() else []
+
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {
+        "BACKEND": (
+            "whitenoise.storage.CompressedManifestStaticFilesStorage"
+            if not DEBUG
+            else "django.contrib.staticfiles.storage.StaticFilesStorage"
+        )
+    },
+}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
